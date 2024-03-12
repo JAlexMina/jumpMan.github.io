@@ -1,0 +1,589 @@
+<!DOCTYPE HTML>
+<html>
+	<link rel="icon" href="images/favicon_io/favicon.ico">
+	<head>
+		<title>J. Alex Mina Portfolio</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<link rel="stylesheet" href="assets/css/main.css" />
+		<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
+		<script src="utility.js"></script>
+    	<script src="gl-matrix-min.js"></script>
+   		<script src="noise3D.js"></script>
+	</head>
+	<body class="landing is-preload">
+
+		<!-- Page Wrapper -->
+			<div id="page-wrapper">
+
+				<!-- Header -->
+					<header id="header" class="alt">
+						
+						<h1><a href="index.html">J. Alex Mina</a></h1>
+						<nav id="nav">
+							<ul>
+								<li class="special">
+									<a href="#menu" class="menuToggle"><span>Menu</span></a>
+									<div id="menu">
+										<ul>
+											<li><a href="#banner" class="more scrolly">Home</a></li>
+											<li><a href="about.html" class="more scrolly">About</a></li>
+											<li><a href="#two" class="more scrolly">2D Game Engine</a></li>
+											<li><a href="#three" class="more scrolly">Portal Project</a></li>
+											<li><a href="#four" class="more scrolly">Path Tracer</a></li>
+										</ul>
+									</div>
+								</li>
+							</ul>
+						</nav>
+					</header>
+
+				<!-- Banner -->
+					<section id="banner">
+						<div id="container123">
+
+							<div style="position:absolute; top: 25% !important; left: 50%; transform: translate(-50%, -50%);" >
+								<h2>J. Alex Mina</h2>
+								<p>Portfolio</p>															
+							</div>
+
+							<div style="position:absolute; top:0; left:0; ">
+								<canvas id="canvas" width="1920" height="1080"></canvas>  <!---------------------------------------------- -->
+
+								<script id="vs-draw" type="x-shader/x-vertex">
+									#version 300 es
+									#define POSITION_LOCATION 0
+									#define VELOCITY_LOCATION 1
+									#define SPAWNTIME_LOCATION 2
+									#define LIFETIME_LOCATION 3
+									#define ID_LOCATION 4
+							
+									precision highp float;
+									precision highp int;
+									precision highp sampler3D;
+							
+									uniform float u_time;
+									uniform vec2 u_acceleration;
+
+									uniform vec2 u_mousePos;
+									//uniform float u_mousey;
+							
+									layout(location = POSITION_LOCATION) in vec3 a_position;
+									layout(location = VELOCITY_LOCATION) in vec2 a_velocity;
+									layout(location = SPAWNTIME_LOCATION) in float a_spawntime;
+									layout(location = LIFETIME_LOCATION) in float a_lifetime;
+									layout(location = ID_LOCATION) in float a_ID;
+
+
+									
+									
+							
+									out vec3 v_position;
+									out vec2 v_velocity;
+									out float v_spawntime;
+									out float v_lifetime;
+							
+									float rand(vec2 co){
+										return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+									}
+							
+									void main()
+									{
+										float z;
+
+										vec2 wind;
+
+										if(u_time > 0.0)
+										{
+											float tt = u_time*100.0;
+											
+											float a = 1.4;
+											float b = -1.5;
+											float c = 1.5;
+											float d = 1.2;
+											float f = -0.6;
+											float stretch = 0.2;
+											
+											float sn = sin(stretch*b*tt);
+											float cs = cos(stretch*d*tt);
+											float funcWithoutCut = a*(sn+c*(cs))+f;
+											wind = vec2(max(min(funcWithoutCut, 0.8), -0.8), 0.0);
+										
+											if(u_time < 5500.0)
+											{
+												wind = vec2(0.0, 0.0);
+											}
+
+											
+
+
+											if (a_spawntime == 0.0 || a_position.y < -1.0) 
+											{
+												// Generate a new particle
+
+												//first spawns are at a random height
+												if(u_time < 100.0)
+												{
+													v_position = vec3((rand(vec2(a_ID, a_position.xy))-0.5)*2.0, (rand(vec2(a_ID, u_time))-0.5), rand(vec2(a_ID, u_time))*3.0);												
+												}
+												//the rest are at the top of the screen
+												else
+												{
+													v_position = vec3((rand(vec2(a_ID, a_position.xy))-0.5)*2.0, 1.0, rand(vec2(a_ID, u_time))*3.0);
+												}
+
+												//********I am using the v_lifetime variable as the position Z value as it doesnt like me using the actual Z value for some reason********
+												v_lifetime = v_position.z;
+												//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+												
+												v_velocity = vec2(0.0, rand(vec2(u_time*0.02, a_ID)))*1.5;
+
+
+												v_spawntime = u_time;												
+
+											} 
+											else 
+											{
+
+
+												v_velocity = a_velocity + (0.01 * (u_acceleration*1.2)) + 0.01*(wind*1.2);
+
+												//v_velocity = a_velocity + (0.01 * (u_acceleration*1.2));
+												v_position = vec3((a_position.xy + 0.01 * v_velocity).x, (a_position.xy + 0.01 * v_velocity).y, v_position.z);
+												v_spawntime = a_spawntime;
+
+												//********I am using the v_lifetime variable as the position Z value as it doesnt like me using the actual Z value for some reason********
+												v_lifetime = a_lifetime;
+												//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+												//if offscreen wrap around ----------left right
+												if(v_position.x < -1.0)
+												{
+													v_position.x = 1.0;
+													v_velocity.x = v_velocity.x * 0.65;
+												}
+												else if(v_position.x > 1.0)
+												{
+													v_position.x = -1.0;
+													v_velocity.x = v_velocity.x * 0.65;
+												}
+
+
+
+
+
+												float radius = 0.1;
+
+												if(distance(u_mousePos, v_position.xy) < radius)
+												{
+													v_velocity = vec2(0.0, 0.0);
+													
+
+													vec2 m2v;
+													m2v.x = -u_mousePos.x+v_position.x;
+													m2v.y = -u_mousePos.y+v_position.y;
+
+													m2v = normalize(m2v);
+													v_position = vec3((m2v*radius) + u_mousePos, v_position.z);
+													
+													v_velocity = a_velocity + 0.01 * (u_acceleration*18.0) + 0.01*(wind*18.0);
+													v_position = vec3(a_position.xy + 0.01 * v_velocity, v_position.z);
+
+													if(distance(u_mousePos, v_position.xy) < radius)
+													{
+														v_velocity = vec2(0.0, 0.0);
+														
+
+														vec2 m2v;
+														m2v.x = -u_mousePos.x+v_position.x;
+														m2v.y = -u_mousePos.y+v_position.y;
+												
+														m2v = normalize(m2v);
+														v_position = vec3((m2v*radius) + u_mousePos, v_position.z);
+													}
+												
+													
+												}
+												
+											}
+											
+											//********I am using the v_lifetime variable as the position Z value as it doesnt like me using the actual Z value for some reason********
+											gl_PointSize = v_lifetime;
+											//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+											gl_Position = vec4(v_position.x, v_position.y, v_position.z, 1.0);
+										}
+									}
+								</script>
+							
+								<script id="fs-draw" type="x-shader/x-fragment">
+									#version 300 es
+									precision highp float;
+									precision highp int;
+							
+									uniform vec4 u_color;
+							
+									out vec4 color;
+							
+									void main()
+									{
+										color = u_color;
+									}
+								</script>
+							
+								<script>
+								(function () {
+									'use strict';
+
+
+									// Clamp number between two values with the following line:
+									const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
+
+									//mouse coords
+									var mousex = -100.0;
+									var mousey = -100.0;
+
+
+									var mouseMove = function(e) {
+										mousex = e.pageX;				
+										mousey = e.pageY;
+									};
+
+
+
+									window.addEventListener("mousemove", mouseMove, false);
+
+							
+									// -- Init Canvas
+									var canvas = document.getElementById('canvas');
+									canvas.width = 1920;
+									canvas.height = 1080;
+
+							
+									// -- Init WebGL Context
+									var gl = canvas.getContext('webgl2', { antialias: false });
+									var isWebGL2 = !!gl;
+									if(!isWebGL2)
+									{
+										document.getElementById('info').innerHTML = 'WebGL 2 is not available.  See <a href="https://www.khronos.org/webgl/wiki/Getting_a_WebGL_Implementation">How to get a WebGL 2 implementation</a>';
+										return;
+									}
+							
+									canvas.addEventListener("webglcontextlost", function(event) {
+										event.preventDefault();
+									}, false);
+							
+									// -- Declare variables for the particle system
+							
+									var NUM_PARTICLES = 1800;
+									var ACCELERATION = -1.0;
+							
+									var appStartTime = Date.now();
+									var currentSourceIdx = 0;
+							
+									var program = initProgram();
+							
+									// Get uniform locations for the draw program
+									var drawTimeLocation = gl.getUniformLocation(program, 'u_time');
+									var drawAccelerationLocation = gl.getUniformLocation(program, 'u_acceleration');
+									var drawColorLocation = gl.getUniformLocation(program, 'u_color');
+
+									var drawmouseLocation = gl.getUniformLocation(program, 'u_mousePos');
+									//var drawmouseyLocation = gl.getUniformLocation(program, 'u_mousey');
+							
+									// -- Initialize particle data
+							
+									var particlePositions = new Float32Array(NUM_PARTICLES * 3);
+									var particleVelocities = new Float32Array(NUM_PARTICLES * 2);
+									var particleSpawntime = new Float32Array(NUM_PARTICLES);
+									var particleLifetime = new Float32Array(NUM_PARTICLES);
+									var particleIDs = new Float32Array(NUM_PARTICLES);
+							
+									var POSITION_LOCATION = 0;
+									var VELOCITY_LOCATION = 1;
+									var SPAWNTIME_LOCATION = 2;
+									var LIFETIME_LOCATION = 3;
+									var ID_LOCATION = 4;
+									var NUM_LOCATIONS = 5;
+									
+							
+									for (var p = 0; p < NUM_PARTICLES; ++p) {
+										particlePositions[p * 3] = 0.0;
+										particlePositions[p * 3 + 1] = 0.0;
+										particlePositions[p * 3 + 2] = 0.0;
+										particleVelocities[p * 2] = 0.0;
+										particleVelocities[p * 2 + 1] = 0.0;
+										particleSpawntime[p] = 0.0;
+										particleLifetime[p] = 0.0;
+										particleIDs[p] = p;
+									}
+									
+
+
+							
+									// -- Init Vertex Arrays and Buffers
+									var particleVAOs = [gl.createVertexArray(), gl.createVertexArray()];
+							
+									// Transform feedback objects track output buffer state
+									var particleTransformFeedbacks = [gl.createTransformFeedback(), gl.createTransformFeedback()];
+									
+									var particleVBOs = new Array(particleVAOs.length);
+									
+							
+									for (var i = 0; i < particleVAOs.length; ++i) {
+										particleVBOs[i] = new Array(NUM_LOCATIONS);
+							
+										// Set up input
+										gl.bindVertexArray(particleVAOs[i]);
+							
+										particleVBOs[i][POSITION_LOCATION] = gl.createBuffer();
+										gl.bindBuffer(gl.ARRAY_BUFFER, particleVBOs[i][POSITION_LOCATION]);
+										gl.bufferData(gl.ARRAY_BUFFER, particlePositions, gl.STREAM_COPY);
+										gl.vertexAttribPointer(POSITION_LOCATION, 3, gl.FLOAT, false, 0, 0);
+										gl.enableVertexAttribArray(POSITION_LOCATION);
+							
+										particleVBOs[i][VELOCITY_LOCATION] = gl.createBuffer();
+										gl.bindBuffer(gl.ARRAY_BUFFER, particleVBOs[i][VELOCITY_LOCATION]);
+										gl.bufferData(gl.ARRAY_BUFFER, particleVelocities, gl.STREAM_COPY);
+										gl.vertexAttribPointer(VELOCITY_LOCATION, 2, gl.FLOAT, false, 0, 0);
+										gl.enableVertexAttribArray(VELOCITY_LOCATION);
+							
+										particleVBOs[i][SPAWNTIME_LOCATION] = gl.createBuffer();
+										gl.bindBuffer(gl.ARRAY_BUFFER, particleVBOs[i][SPAWNTIME_LOCATION]);
+										gl.bufferData(gl.ARRAY_BUFFER, particleSpawntime, gl.STREAM_COPY);
+										gl.vertexAttribPointer(SPAWNTIME_LOCATION, 1, gl.FLOAT, false, 0, 0);
+										gl.enableVertexAttribArray(SPAWNTIME_LOCATION);
+							
+										particleVBOs[i][LIFETIME_LOCATION] = gl.createBuffer();
+										gl.bindBuffer(gl.ARRAY_BUFFER, particleVBOs[i][LIFETIME_LOCATION]);
+										gl.bufferData(gl.ARRAY_BUFFER, particleLifetime, gl.STREAM_COPY);
+										gl.vertexAttribPointer(LIFETIME_LOCATION, 1, gl.FLOAT, false, 0, 0);
+										gl.enableVertexAttribArray(LIFETIME_LOCATION);
+							
+										particleVBOs[i][ID_LOCATION] = gl.createBuffer();
+										gl.bindBuffer(gl.ARRAY_BUFFER, particleVBOs[i][ID_LOCATION]);
+										gl.bufferData(gl.ARRAY_BUFFER, particleIDs, gl.STATIC_READ);
+										gl.vertexAttribPointer(ID_LOCATION, 1, gl.FLOAT, false, 0, 0);
+										gl.enableVertexAttribArray(ID_LOCATION);
+							
+										gl.bindBuffer(gl.ARRAY_BUFFER, null);
+										
+										// Set up output
+										gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, particleTransformFeedbacks[i]);
+										gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, particleVBOs[i][POSITION_LOCATION]);
+										gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 1, particleVBOs[i][VELOCITY_LOCATION]);
+										gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 2, particleVBOs[i][SPAWNTIME_LOCATION]);
+										gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 3, particleVBOs[i][LIFETIME_LOCATION]);
+							
+									}
+							
+									function initProgram() {
+							
+										// Setup program for transform feedback
+										function createShader(gl, source, type) {
+											var shader = gl.createShader(type);
+											gl.shaderSource(shader, source);
+											gl.compileShader(shader);
+											return shader;
+										}
+							
+										var vshader = createShader(gl, getShaderSource('vs-draw'), gl.VERTEX_SHADER);
+										var fshader = createShader(gl, getShaderSource('fs-draw'), gl.FRAGMENT_SHADER);
+							
+										var program = gl.createProgram();
+										gl.attachShader(program, vshader);
+										gl.attachShader(program, fshader);
+							
+										var varyings = ['v_position', 'v_velocity', 'v_spawntime', 'v_lifetime'];
+										gl.transformFeedbackVaryings(program, varyings, gl.SEPARATE_ATTRIBS);
+										gl.linkProgram(program);
+							
+										// check
+										var log = gl.getProgramInfoLog(program);
+										if (log) {
+											console.log(log);
+										}
+							
+										log = gl.getShaderInfoLog(vshader);
+										if (log) {
+											console.log(log);
+										}
+							
+										log = gl.getShaderInfoLog(fshader);
+										if (log) {
+											console.log(log);
+										}
+							
+										gl.deleteShader(vshader);
+										gl.deleteShader(fshader);
+							
+										return program;
+									}
+							
+									gl.useProgram(program);
+									gl.uniform4f(drawColorLocation, 0.7, 0.9, 1.0, 1.0);
+									gl.uniform2f(drawAccelerationLocation, 0.0, ACCELERATION);
+									 
+									
+									gl.enable(gl.BLEND);
+									gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+							
+									function render() { 
+										
+										var time = Date.now() - appStartTime;
+										var destinationIdx = (currentSourceIdx + 1) % 2;
+							
+										// Set the viewport
+										gl.viewport(0, 0, canvas.width, canvas.height - 10);
+							
+										// Clear color buffer
+										gl.clearColor(0.0, 0.0, 0.0, 0.0);
+										gl.clear(gl.COLOR_BUFFER_BIT);
+							
+										// Toggle source and destination VBO
+										var sourceVAO = particleVAOs[currentSourceIdx];
+										var destinationTransformFeedback = particleTransformFeedbacks[destinationIdx];
+							
+										gl.bindVertexArray(sourceVAO);
+										gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, destinationTransformFeedback);
+							
+										// NOTE: The following four lines shouldn't be necessary, but are required to work in ANGLE
+										// due to a bug in its handling of transform feedback objects.
+										// https://bugs.chromium.org/p/angleproject/issues/detail?id=2051
+										gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, particleVBOs[destinationIdx][POSITION_LOCATION]);
+										gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 1, particleVBOs[destinationIdx][VELOCITY_LOCATION]);
+										gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 2, particleVBOs[destinationIdx][SPAWNTIME_LOCATION]);
+										gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 3, particleVBOs[destinationIdx][LIFETIME_LOCATION]);
+
+							
+										// Set uniforms
+										gl.uniform1f(drawTimeLocation, time);
+										gl.uniform2f(drawmouseLocation, ((mousex - (canvas.width/2.0))/canvas.width)*2.0, -((mousey - (canvas.height/2.0))/canvas.height)*2.0); 
+
+										
+
+										//console.log(((mousex - (canvas.width/2.0))/canvas.width)*2.0, ", ", ((mousey - (canvas.height/2.0))/canvas.height)*2.0);
+										//console.log(mousex, ", ", mousey);
+										
+
+
+
+										// Draw particles using transform feedback
+										gl.beginTransformFeedback(gl.POINTS);
+										gl.drawArrays(gl.POINTS, 0, NUM_PARTICLES);
+										gl.endTransformFeedback();
+							
+										// Ping pong the buffers
+										currentSourceIdx = (currentSourceIdx + 1) % 2;
+							
+										requestAnimationFrame(render);
+									}
+							
+									requestAnimationFrame(render);
+							
+									// If you have a long-running page, and need to delete WebGL resources, use:
+									//
+									// gl.deleteProgram(program);
+									// for (var i = 0; i < particleVAOs.length; ++i) {
+									//     gl.deleteVertexArray(particleVAOs[i]); 
+									//     gl.deleteTransformFeedback(particleTransformFeedbacks[i]);
+									//     for (var j = 0; j < NUM_LOCATIONS; ++j) {
+									//         gl.deleteBuffer(particleVBOs[i][j]);
+									//     }
+									// }
+								})();
+								</script>
+
+
+							</div>
+
+							<div style="position:absolute; top: 90% !important; left: 50%; transform: translate(-50%, -50%);" >
+								<a href="#one" class="more scrolly">Learn More</a>
+							</div>
+						</div>
+
+						
+
+						
+
+						
+					</section>
+					
+
+				<!-- One -->
+					<section id="one" class="wrapper style1 special">
+						<div class="inner">
+							<header class="major">
+								<h2>This is my portfolio as a <br/>computer graphics software engineer</h2>
+								<p>I have years of experience working with multiple languages <br/>on lots of diffent types of projects like the one you see above! <br/> Below are also some that I am particularly proud of.</p>
+							</header>
+							<ul class="icons major">
+								<li><img src="images/c++.png" class="label" style="width:48px;"></li>
+								<li><img src="images/open.png" class="label" style="width:84px;"></li>
+								<li><img src="images/java.png" class="label" style="width:60px;"></li>
+								<!-- <li><span class="icon fa-gem major style1"><span class="label">Lorem</span></span></li>
+								<li><span class="icon fa-heart major style2"><span class="label">Ipsum</span></span></li>
+								<li><span class="icon solid fa-code major style3"><span class="label">Dolor</span></span></li> -->
+							</ul>
+						</div>
+					</section>
+
+				<!-- Two -->
+				<section id="two" class="wrapper alt style2">
+					<section class="spotlight">
+							<div class="image" "><img src="images/pic01.jpg" alt="" height="500px"/></div><div class="content">
+								<h2>2D Game Engine</h2>
+								<p>My 2D game engine was written for a class and focuses on a 
+								   lighting system that has attenuation and shadows all in a 2D format!</p>
+								<a href="https://github.com/JAlexMina/2dGameEngine" class="button Default">Project Github Repository</a>
+							</div>
+						</section>
+						<section id="three" class="spotlight">
+							<div class="image" "><img src="images/pic02.jpg" alt="" height="500px"/></div><div class="content">
+								<h2>Portal 3D Game Engine</h2>
+								<p>For my 3D game engine, I wrote all the physics and 
+								   systems that a basic game engine should have as well as a final project where 
+								   I implemented Valve's portal effect from the game Portal!</p>
+								<a href="https://github.com/JAlexMina/Portal-Game-Engine" class="button Default">Project Github Repository</a>
+							</div>
+						</section>
+						<section id="four" class="spotlight">
+							<div class="image" ><img src="images/pic03.jpg" alt="" height="500px"/></div><div class="content">
+								<h2>Path Tracer</h2>
+								<p>For my Advanced Computer Graphics course I implemented the path tracing algorithm 
+								   in c++ and can get incredibly photorealistic outputs from this 
+								   stochastic offline rendering technique!</p>
+								<a href="https://github.com/JAlexMina/path-tracer" class="button Default">Project Github Repository</a>
+							</div>
+						</section>
+					</section>
+
+
+
+				<!-- Footer -->
+					<footer id="footer">
+						<ul class="icons">
+							<li><a title="Facebook" href="https://www.facebook.com/alex0k1" class="icon brands fa-facebook-f"><span class="label">Facebook</span></a></li>
+							<li><a title="Instagram" href="https://www.instagram.com/alex0k12/" class="icon brands fa-instagram"><span class="label">Instagram</span></a></li>
+							<li><a title="Linkedin" href="https://www.linkedin.com/in/jalexmina/" class="icon brands fa-linkedin"><span class="label">Linkedin</span></a></li>
+							<li><a title="Email" href="mailto:juanmina1200@gmail.com" class="icon solid fa-envelope"><span class="label">Email</span></a></li>
+							<li><a title="Resume" href="assets/Alex-Resume.pdf" class="icon solid fa-receipt"><span class="label">Resume</span></a></li>
+						</ul>
+	
+					</footer>
+
+			</div>
+
+		<!-- Scripts -->
+			<script src="assets/js/jquery.min.js"></script>
+			<script src="assets/js/jquery.scrollex.min.js"></script>
+			<script src="assets/js/jquery.scrolly.min.js"></script>
+			<script src="assets/js/browser.min.js"></script>
+			<script src="assets/js/breakpoints.min.js"></script>
+			<script src="assets/js/util.js"></script>
+			<script src="assets/js/main.js"></script>
+
+	</body>
+</html>
+
+
